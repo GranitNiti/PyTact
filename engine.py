@@ -13,14 +13,13 @@ import functools
 class StimulationEngine:
     __metaclass__ = ABCMeta
 
-    def __init__(self, config, debug=False, visualiser=DummyPatternVisualiser(), slots=11):
+    def __init__(self, config, visualiser=DummyPatternVisualiser(), slots=11):
         self.config = config
-        self.debug = debug
         self.connected = False
         self.visualiser = visualiser
         self.slots = slots
 
-    def _intit_settings(self):
+    def _init_settings(self):
         m = self.slots / 2 + 1
         self.intensities_pyramid = [x + 1 if x < m else self.slots - x for x in range(self.slots)]
         self.intensities_pyramid_max = max(self.intensities_pyramid)
@@ -133,9 +132,6 @@ class StimulationEngine:
     def get_visualiser(self):
         return self.visualiser
 
-    def set_debug(self, debug):
-        self.debug = debug
-
     def is_connected(self):
         return self.connected
 
@@ -178,13 +174,12 @@ class StimulationEngine:
 
 
 class FESStimulationEngine(StimulationEngine):
-    def __init__(self, config, debug=False, visualiser=DummyPatternVisualiser()):
+    def __init__(self, config, visualiser=DummyPatternVisualiser()):
         self.config = config
-        self.debug = debug
         self.connected = False
         self.visualiser = visualiser
         self.fescomm = FESDeviceCommunication()
-        self._intit_settings()
+        self._init_settings()
         # print self.debug
 
     def set_frequency(self, frequency):
@@ -193,7 +188,7 @@ class FESStimulationEngine(StimulationEngine):
         return res
 
     def _connect(self):
-        print 'connecting... port:', self.config.get_port(), 'baud', self.config.get_baud(), self.debug
+        print 'connecting... port:', self.config.get_port(), 'baud', self.config.get_baud()
         try:
             self.ser = serial.Serial(self.config.get_port(), self.config.get_baud())
             print 'open: ', self.ser.isOpen()
@@ -264,11 +259,12 @@ class FESDeviceCommunication:
 
 class VibroStimulationEngine(StimulationEngine):
     def __init__(self, config, channels_no=9, visualiser=DummyPatternVisualiser()):
-        self.config = config
+        super(VibroStimulationEngine, self).__init__(config, visualiser)
+        #self.config = config
         self.connected = False
-        self.visualiser = visualiser
+        #self.visualiser = visualiser
         self.channelsNo = channels_no
-        self._intit_settings()
+        self._init_settings()
         self.values = [0] * channels_no
 
     def set_frequency(self, frequency):
@@ -280,15 +276,21 @@ class VibroStimulationEngine(StimulationEngine):
         return True
 
     def _disconnect(self):
-        if not self.debug:
-            self.ser.close()
+        self.ser.close()
         return True
 
-    def _set_vibrators(self, arr):
+    def _set_vibrators(self, vals):
         magic0 = 0x4B
         magic1 = 0x52
+        arr = self._get_rearanged_values(vals)
         checksum = functools.reduce(lambda a, b: a ^ b, arr)
         self.ser.write(struct.pack('B' * (self.channelsNo + 3), magic0, magic1, *(arr + [checksum])))
+
+    def _get_rearanged_values(self, vals):
+        nvals = [] + vals
+        nvals[2], nvals[6] = nvals[6], nvals[2]
+        nvals[0], nvals[8] = nvals[8], nvals[0]
+        return nvals
 
     def _start_stimulation_tacton(self, tacton, intensity=None):
         i = intensity or tacton.get_intensity()
@@ -313,6 +315,7 @@ class LogStimulationEngine(StimulationEngine):
     def __init__(self, visualiser=DummyPatternVisualiser()):
         self.visualiser = visualiser
         self.connected = False
+        self.visualiser.init()
 
     def set_frequency(self, frequency):
         print 'setting frequency to', frequency
@@ -329,10 +332,10 @@ class LogStimulationEngine(StimulationEngine):
         return True
 
     def _start_stimulation_tacton(self, tacton, intensity=None):
-        print 'stimulating single tacton', tacton
+        print 'stimulating single tacton', tacton, intensity
 
     def _stop_stimulation(self, tacton):
-        print 'stimulating single tacton', tacton
+        print 'stimulating single tacton', tacton, 0
 
 
 class TestStimulationEngine(StimulationEngine):

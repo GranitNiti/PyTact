@@ -284,6 +284,7 @@ class PatternTacton:
         self.channels = []
         self.slots = 11
         self.stim_slots = None
+        self.context = None
         # print 'stimtype', stimtype
 
     def load_from_dict(self, dict_data):

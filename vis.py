@@ -35,15 +35,19 @@ class Actuator:
         return self.intensity
 
 
-class PatternVisualiser:
+class PatternVisualiser(object):
     def __init__(self, actuator_radius=25):
         self.actuator_radius = actuator_radius
         self.actuactors = []
+        self.hide = False
+        self.initialized = False
 
     def init(self):
         self._init()
+        self.hide = False
 
     def _init(self):
+        print '_init'
         pygame.init()
         pygame.mixer.pre_init(frequency=22050, size=-16, channels=1)  # setup mixer to avoid sound lag
         pygame.font.init()
@@ -53,11 +57,12 @@ class PatternVisualiser:
         self.w, self.h = (info_object.current_w, info_object.current_h)
         self.screen = pygame.display.set_mode((self.w, self.h), pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.FULLSCREEN)
         # w,h = 800,600
-        self.w, self.h = int(self.w * 0.5), int(self.h * 0.5)
+        self.w, self.h = int(self.w * 0.9), int(self.h * 0.9)
         self.screen = pygame.display.set_mode((self.w, self.h), pygame.HWSURFACE | pygame.DOUBLEBUF)
 
-        fontpath = pygame.font.match_font('bitstreamverasans')
-        self.font = pygame.font.Font(fontpath, int(self.w / 32))
+        self.fontpath = pygame.font.match_font('bitstreamverasans')
+        self.font = pygame.font.Font(self.fontpath, int(self.w / 32))
+        self.fonts = {}
 
         self.red = (255, 0, 0)
         self.green = (0, 255, 0)
@@ -69,9 +74,11 @@ class PatternVisualiser:
 
         self.screen.fill(self.black)
         pygame.display.update()
+        self.initialized = True
 
     def set_actuator_intensity(self, _id, intensity):
         ix = _id - 1
+        #print ix, _id, intensity
         old_intensity = self.actuactors[ix].get_intensity()
         self.actuactors[ix].set_intensity(intensity)
 
@@ -86,30 +93,48 @@ class PatternVisualiser:
         self.draw_current_stimulations()
 
     def draw_current_stimulations(self):
+        #print 'draw_current_stimulations'
         self.draw_stimulations(self.actuactors)
 
+    def show_text(self, txt, clear_before=False, position=None, size=32):
+        if clear_before:
+            self.screen.fill(self.black)
+
+        font = self._get_font_by_size(size)
+        font_surface = font.render(txt, True, (0xFF, 0xFF, 0xFF))
+        if position is None:
+            sw, sh = font_surface.get_size()
+            position = (self.w / 2 - sw / 2, self.h / 2 - sh / 2)
+
+        self.screen.blit(font_surface, position)
+        pygame.display.flip()
+
     def draw_stimulations(self, actuactors):
-        for actuactor in actuactors:
+        if not self.hide:
+            for actuactor in actuactors:
+                #print 'draw_stimulations, actuactor', actuactor
+                color = self.green if actuactor.get_intensity() else self.red
+                txtcolor = self.blue if actuactor.get_intensity() else self.white
+                pygame.gfxdraw.filled_circle(self.screen, actuactor.get_x(), actuactor.get_y(), self.actuator_radius, color)
+                font_surface = self.font.render(str(actuactor.get_id()), True, txtcolor)
+                sw, sh = font_surface.get_size()
+                self.screen.blit(font_surface, (actuactor.get_x() - sw / 2, actuactor.get_y() - sh / 2))
+
+                pygame.display.flip()
+
+    def draw_stimulation(self, actuactor):
+        if not self.hide:
+            #print 'draw_stimulation, actuactor', actuactor
             color = self.green if actuactor.get_intensity() else self.red
             txtcolor = self.blue if actuactor.get_intensity() else self.white
+
             pygame.gfxdraw.filled_circle(self.screen, actuactor.get_x(), actuactor.get_y(), self.actuator_radius, color)
+
             font_surface = self.font.render(str(actuactor.get_id()), True, txtcolor)
             sw, sh = font_surface.get_size()
             self.screen.blit(font_surface, (actuactor.get_x() - sw / 2, actuactor.get_y() - sh / 2))
 
-            pygame.display.flip()
-
-    def draw_stimulation(self, actuactor):
-        color = self.green if actuactor.get_intensity() else self.red
-        txtcolor = self.blue if actuactor.get_intensity() else self.white
-
-        pygame.gfxdraw.filled_circle(self.screen, actuactor.get_x(), actuactor.get_y(), self.actuator_radius, color)
-
-        font_surface = self.font.render(str(actuactor.get_id()), True, txtcolor)
-        sw, sh = font_surface.get_size()
-        self.screen.blit(font_surface, (actuactor.get_x() - sw / 2, actuactor.get_y() - sh / 2))
-
-        pygame.display.update((actuactor.get_x(), actuactor.get_x(), self.actuator_radius, self.actuator_radius))
+            pygame.display.update((actuactor.get_x(), actuactor.get_y(), self.actuator_radius, self.actuator_radius))
 
     def init_actuators_with_positions(self, positions):
         self.actuactors = []
@@ -121,13 +146,40 @@ class PatternVisualiser:
     def quit(self):
         pygame.quit()
 
+    def get_hide(self):
+        return self.hide
+
+    def set_hide(self, hide):
+        if self.hide != hide:
+            self.hide = hide
+
+            if self.initialized:
+                self.redraw()
+
+    def _get_font_by_size(self, size):
+        if size not in self.fonts:
+            self.fonts[size] = pygame.font.Font(self.fontpath, int(self.w / size))
+        return self.fonts[size]
+
+    def clear(self):
+        self.screen.fill(self.black)
+        pygame.display.flip()
+
+    def redraw(self):
+        if self.hide:
+            self.clear()
+        else:
+            self.draw_current_stimulations()
+
 
 class DummyPatternVisualiser(PatternVisualiser):
     def __init__(self, debug=False):
+        super(DummyPatternVisualiser, self).__init__()
         self.debug = debug
         pass
 
     def init(self):
+        self._init()
         pass
 
     def set_actuator_intensities(self, ids, intensities):
@@ -157,7 +209,8 @@ class DummyPatternVisualiser(PatternVisualiser):
 
 class CircularPatternVisualiser(PatternVisualiser):
     def __init__(self, no_actuators=6, actuator_radius=25):
-        self.actuator_radius = actuator_radius
+        super(CircularPatternVisualiser, self).__init__(actuator_radius)
+        #self.actuator_radius = actuator_radius
         self.no_actuators = no_actuators
 
     def init(self):
@@ -183,7 +236,8 @@ class CircularPatternVisualiser(PatternVisualiser):
 
 class FilledCircularPatternVisualiser8(PatternVisualiser):
     def __init__(self, actuator_radius=25):
-        self.actuator_radius = actuator_radius
+        super(FilledCircularPatternVisualiser8, self).__init__(actuator_radius)
+        #self.actuator_radius = actuator_radius
         self.no_actuators = 8
 
     def init(self):
@@ -211,7 +265,8 @@ class FilledCircularPatternVisualiser8(PatternVisualiser):
 
 class LinePatternVisualiser(PatternVisualiser):
     def __init__(self, no_actuators=6, actuator_radius=25):
-        self.actuator_radius = actuator_radius
+        super(LinePatternVisualiser, self).__init__(actuator_radius)
+        #self.actuator_radius = actuator_radius
         self.no_actuators = no_actuators
 
     def init(self):
@@ -230,7 +285,8 @@ class LinePatternVisualiser(PatternVisualiser):
 
 class GridPatternVisualiser(PatternVisualiser):
     def __init__(self, no_rows=2, no_columns=3, actuator_radius=25):
-        self.actuator_radius = actuator_radius
+        super(GridPatternVisualiser, self).__init__(actuator_radius)
+        #self.actuator_radius = actuator_radius
         self.no_actuators = no_rows*no_columns
         self.no_rows = no_rows
         self.no_columns = no_columns
@@ -252,7 +308,8 @@ class GridPatternVisualiser(PatternVisualiser):
 
 class GenericPatternVisualiser(PatternVisualiser):
     def __init__(self, positions=None, actuator_radius=25):
-        self.actuator_radius = actuator_radius
+        super(GenericPatternVisualiser, self).__init__(actuator_radius)
+        #self.actuator_radius = actuator_radius
         self.no_actuators = len(acutator_posotions)
         self.positions = positions or []
 
