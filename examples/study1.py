@@ -33,6 +33,7 @@ def common_pump(event):
 
 def check_pause(visualiser):
     global pause
+
     while pause:
         visualiser.show_text('Paused')
         for event in pygame.event.get():
@@ -132,6 +133,7 @@ if __name__ == "__main__":
     no_choices = 4
     no_rounds = 5
     no_repetitions = 2
+    pause = False
 
     if len(sys.argv) > 4:
         user_code = sys.argv[1]
@@ -166,8 +168,9 @@ if __name__ == "__main__":
 
     visualiser = LinePatternVisualiser(no_actuators=3, actuator_radius=50)
     visualiser.set_hide(True)
+
     #stim_engine = LogStimulationEngine(visualiser=visualiser)
-    stim_config = VibroStimulationEngineConfig(port="/dev/cu.usbmodemFA141")
+    stim_config = VibroStimulationEngineConfig(port="/dev/cu.usbmodemFD131")
     stim_engine = VibroStimulationEngine(visualiser=visualiser, config=stim_config)
 
     three_channels = list(itertools.permutations(channels, 3))

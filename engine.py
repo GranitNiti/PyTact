@@ -333,6 +333,7 @@ class LogStimulationEngine(StimulationEngine):
 
     def _start_stimulation_tacton(self, tacton, intensity=None):
         print 'stimulating single tacton', tacton, intensity
+        time.sleep(tacton.get_duration())
 
     def _stop_stimulation(self, tacton):
         print 'stimulating single tacton', tacton, 0
