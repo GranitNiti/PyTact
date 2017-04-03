@@ -5,10 +5,28 @@ from math import *
 from utils import *
 import serial
 from serial import SerialException
-import time
+#import time
 import struct
 import functools
+import inspect
+#import time
 
+
+from time import sleep as tmsleep
+from time import time as tmtime
+class Sleeper:
+    def sleep(self, val):
+        print('sleep', val)
+        #curframe = inspect.currentframe()
+        #calframe = inspect.getouterframes(curframe, 2)
+        #print ('caller name:', calframe[1][3])
+        #print (calframe)
+        tmsleep(val)
+
+    def time(self):
+        return tmtime()
+
+time = Sleeper()
 
 class StimulationEngine:
     __metaclass__ = ABCMeta
@@ -45,23 +63,26 @@ class StimulationEngine:
         else:
             return False
 
-    def stimulate_pattern(self, pattern_tacton):
+    def stimulate_pattern(self, pattern_tacton, stop=True):
+        print pattern_tacton.context
         if pattern_tacton.is_simple_stimuls() and pattern_tacton.get_gap() >= 0:
-            for tacton in pattern_tacton.get_tactons():
-                self.stimulate_tacton(tacton)
+            for i, tacton in enumerate(pattern_tacton.get_tactons()):
+                self.stimulate_tacton(tacton, False)
 
                 if pattern_tacton.get_stimulation_type() == StimuliTypes.SPATIO_TEMPORAL:
+                    time.sleep(tacton.get_duration())
                     self.stop_stimulation(tacton)
 
                 if pattern_tacton.get_gap() > 0:
-                    time.sleep(pattern_tacton.get_gap())
+                    if i < len(pattern_tacton.get_tactons()) - 1:
+                        time.sleep(pattern_tacton.get_gap())
+                        print('sleep', pattern_tacton.get_gap())
 
-            if pattern_tacton.get_stimulation_type() == StimuliTypes.SPATIO_TEMPORAL_OVERLAPING:
-                for tacton in pattern_tacton.get_tactons():
-                    self.stop_stimulation(tacton)
+            if stop:
+                self.stop_stimulation(pattern_tacton)
         else:
             stimslots = pattern_tacton.get_stimulation_slots()
-            self.stimulate_single_tactons_in_slots(stimslots, pattern_tacton.get_tactons())
+            self.stimulate_single_tactons_in_slots(stimslots, pattern_tacton.get_tactons(), stop)
 
     def stimulate_single_tactons_in_slots(self, stimslots, all_tactons, stop=True):
         for intensities, tactons in zip(stimslots.get_intensities(), stimslots.get_tactons()):
@@ -102,10 +123,10 @@ class StimulationEngine:
         if isinstance(tacton, SingleTacton):
             self._start_stimulation_tacton(tacton)
         elif isinstance(tacton, SimultaneousTactonsGroup):
-            for t in tacton.get_tactons():
+            for i, t in enumerate(tacton.get_tactons()):
                 self._start_stimulation_tacton(t)
 
-                if tacton.get_activation_delay() > 0:
+                if i < len(tacton.get_tactons()) -1 and tacton.get_activation_delay() > 0:
                     time.sleep(tacton.get_activation_delay())
         if delay:
             time.sleep(tacton.get_duration())
@@ -260,9 +281,7 @@ class FESDeviceCommunication:
 class VibroStimulationEngine(StimulationEngine):
     def __init__(self, config, channels_no=9, visualiser=DummyPatternVisualiser()):
         super(VibroStimulationEngine, self).__init__(config, visualiser)
-        #self.config = config
         self.connected = False
-        #self.visualiser = visualiser
         self.channelsNo = channels_no
         self._init_settings()
         self.values = [0] * channels_no
@@ -271,7 +290,7 @@ class VibroStimulationEngine(StimulationEngine):
         pass
 
     def _connect(self):
-        self.ser = serial.Serial(port=self.config.get_port(), baudrate=self.config.get_baud(), timeout=None,
+        self.ser = serial.Serial(port=self.config.get_port(), baudrate=self.config.get_baud(), timeout=1,
                                  parity=serial.PARITY_NONE)
         return True
 
@@ -280,11 +299,19 @@ class VibroStimulationEngine(StimulationEngine):
         return True
 
     def _set_vibrators(self, vals):
+        print(vals)
         magic0 = 0x4B
         magic1 = 0x52
-        arr = self._get_rearanged_values(vals)
+        #arr = self._get_rearanged_values(vals)
+        arr = vals
         checksum = functools.reduce(lambda a, b: a ^ b, arr)
         self.ser.write(struct.pack('B' * (self.channelsNo + 3), magic0, magic1, *(arr + [checksum])))
+
+    def _read_lines(self):
+        line = self.ser.readline()
+        while line:
+            print(line)
+            line = self.ser.readline()
 
     def _get_rearanged_values(self, vals):
         nvals = [] + vals
@@ -295,6 +322,12 @@ class VibroStimulationEngine(StimulationEngine):
     def _start_stimulation_tacton(self, tacton, intensity=None):
         i = intensity or tacton.get_intensity()
         self.values[tacton.get_channel() - 1] = i
+        self._set_vibrators(self.values)
+
+    def stop_stimulation(self, tacton):
+        self.visualise_stimulation_off(tacton)
+        for channel in tacton.get_channels():
+            self.values[channel - 1] = 0
         self._set_vibrators(self.values)
 
     def _stop_stimulation(self, tacton):
@@ -309,6 +342,90 @@ class VibroStimulationEngine(StimulationEngine):
             for intensity, tacton in zip(intensities, tactons):
                 self.values[tacton.get_channel() - 1] = intensity
         self._set_vibrators(self.values)
+
+
+#this engine handles the delays internally
+class InlineVibroStimulationEngine(VibroStimulationEngine):
+    def __init__(self, config, channels_no=9, visualiser=DummyPatternVisualiser()):
+        super(InlineVibroStimulationEngine, self).__init__(config, channels_no, visualiser)
+        self.time_scale = 1000;
+
+    def _set_vibrators(self, data):
+        magic_start = 0xDE
+        magic_end = 0xE9
+        #arr = self._get_rearanged_values(vals)
+        arr = data
+        print arr
+        checksum = functools.reduce(lambda a, b: a ^ b, arr)
+        total_array = [magic_start] + arr + [magic_end, checksum]
+        encoded = struct.pack('B' * len(total_array), *total_array)
+        self.ser.write(encoded)
+        self._read_lines()
+
+    def _read_lines(self):
+        line = self.ser.readline()
+        while line:
+            print(line)
+            line = self.ser.readline()
+
+    def stimulate_pattern(self, pattern_tacton, stop=True):
+        if not self.is_connected():
+            self.connect()
+
+        data = []
+        self._get_activation_tacton_data(pattern_tacton, data, stop)
+        self._set_vibrators(data)
+
+
+    #todo: take care iof activation data
+    def _get_deactivation_tacton_data(self, tacton, data = []):
+        for channel in tacton.get_channels():
+            data.append(channel-1)
+            data.append(0)
+            data.append(0)
+
+        '''
+        if isinstance(tacton, SingleTacton):
+            data.append(tacton.get_channel() - 1)
+            data.append(0)
+            data.append(0)
+        elif isinstance(tacton, SimultaneousTactonsGroup) or isinstance(tacton, PatternTacton):
+            for t in tacton.get_tactons():
+                self._get_deactivation_tacton_data(t)
+        '''
+
+    def _get_activation_tacton_data(self, tacton, data = [], stop=True):
+        if isinstance(tacton, SingleTacton):
+            data.append(tacton.get_channel() - 1)
+            data.append(tacton.get_intensity())
+            data.append(int(tacton.get_duration()*self.time_scale))
+            if stop:
+                self._get_deactivation_tacton_data(tacton, data)
+        elif isinstance(tacton, SimultaneousTactonsGroup):
+            n = len(tacton.get_tactons())
+            for i, t in enumerate(tacton.get_tactons()):
+                data.append(t.get_channel() - 1)
+                data.append(t.get_intensity())
+                if i < n-1:
+                    data.append(int(tacton.get_activation_delay()*self.time_scale))
+                else:
+                    data.append(int(tacton.get_duration()*self.time_scale))
+            if stop:
+                self._get_deactivation_tacton_data(tacton, data)
+
+        elif isinstance(tacton, PatternTacton):
+            if tacton.is_simple_stimuls() and tacton.get_gap() >= 0:
+                for i, t in enumerate(tacton.get_tactons()):
+                    if tacton.get_stimulation_type() == StimuliTypes.SPATIO_TEMPORAL:
+                        self._get_activation_tacton_data(t, data, True)
+
+                        if i < len(tacton.get_tactons()) -1:
+                            data[-1] += int(tacton.get_gap() * self.time_scale)
+                    else:
+                        self._get_activation_tacton_data(t, data, True)
+            else:
+                pass
+                #need to implement this shit
 
 
 class LogStimulationEngine(StimulationEngine):

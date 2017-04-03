@@ -109,6 +109,16 @@ class PatternVisualiser(object):
         self.screen.blit(font_surface, position)
         pygame.display.flip()
 
+    def show_image(self, img, clear_before=False, position=None):
+        if clear_before:
+            self.screen.fill(self.black)
+
+        if position is None:
+            position = (self.w / 2 - img.get_width() / 2, self.h / 2 - img.get_height() / 2)
+
+        self.screen.blit(img, position)
+        pygame.display.flip()
+
     def draw_stimulations(self, actuactors):
         if not self.hide:
             for actuactor in actuactors:
@@ -171,10 +181,50 @@ class PatternVisualiser(object):
         else:
             self.draw_current_stimulations()
 
+    def get_screen(self):
+        return self.screen
+
 
 class DummyPatternVisualiser(PatternVisualiser):
     def __init__(self, debug=False):
-        super(DummyPatternVisualiser, self).__init__()
+        #super(DummyPatternVisualiser, self).__init__()
+        self.debug = debug
+        pass
+
+    def init(self):
+        #self._init()
+        pass
+
+    def show_text(self, txt, clear_before=False, position=None, size=32):
+        pass
+
+    def set_actuator_intensities(self, ids, intensities):
+        if self.debug:
+            print 'set_actuator_intensities', ids, intensities
+
+    def set_actuator_intensity(self, _id, intensity):
+        if self.debug:
+            print 'set_intensity', _id, intensity
+
+    def draw_current_stimulations(self):
+        if self.debug:
+            print 'draw_current_stimulations'
+
+    def draw_stimulation(self, actuactor):
+        if self.debug:
+            print 'draw_stimulation', vars(actuactor)
+
+    def init_actuators_with_positions(self, positions):
+        if self.debug:
+            print 'init_actuators_with_positions', positions
+
+    def quit(self):
+        if self.debug:
+            print 'quit'
+
+class SimplePatternVisualiser(PatternVisualiser):
+    def __init__(self, debug=False):
+        super(SimplePatternVisualiser, self).__init__()
         self.debug = debug
         pass
 
@@ -310,7 +360,7 @@ class GenericPatternVisualiser(PatternVisualiser):
     def __init__(self, positions=None, actuator_radius=25):
         super(GenericPatternVisualiser, self).__init__(actuator_radius)
         #self.actuator_radius = actuator_radius
-        self.no_actuators = len(acutator_posotions)
+        self.no_actuators = len(positions)
         self.positions = positions or []
 
     def init(self):

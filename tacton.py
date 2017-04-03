@@ -83,6 +83,9 @@ class SingleTactonFES(SingleTacton):
     def get_channel(self):
         return self.channel
 
+    def get_channels(self):
+        return [self.channel]
+
     def get_shape(self):
         return self.shape
 
@@ -158,6 +161,9 @@ class SingleTactonVibro(SingleTacton):
 
     def get_channel(self):
         return self.channel
+
+    def get_channels(self):
+        return [self.channel]
 
     def get_shape(self):
         return self.shape
@@ -244,7 +250,7 @@ class SimultaneousTactonsGroup:
         self.channels = []
 
         for tacton in self.tactons:
-            self.channels.append(tacton.getChannel())
+            self.channels.append(tacton.get_channel())
 
         return self.channels
 
