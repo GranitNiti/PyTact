@@ -1,5 +1,5 @@
 # PyTacton:
-This is a lightweight Python Module for Haptic Feedback suitable for easy prototyping user studies that invlove haptic stimulation. It provides eassy menas of creating comple patterns, stimulating and visualising them. The suuport for devices can be achieved through minimal code (see belove). If you add support for a device you use, please push the changes so that others can benefit from your code.
+This is a lightweight Python Module for Haptic Feedback suitable for easy prototyping user studies that involve haptic stimulation. It provides easy means of creating complex patterns, stimulating and visualising them. The support for devices can be achieved through minimal code (see belove). If you add support for a device you use, please push the changes so that others can benefit from your code.
 
 ###### Code sample for creating an stimulation engine, creating a complex pattern and stimulating it
 
